@@ -22,8 +22,8 @@ app.include_router(cloudinary.router)
 
 
 origins = [
-    # "http://localhost:5173",
-    "https://hire-journey.vercel.app/",
+    "http://localhost:5173",
+    "https://hire-journey.vercel.app",
     
 ]
 
