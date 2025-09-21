@@ -29,7 +29,7 @@ class AddApplicationRequest(BaseModel):
     applied_date: Optional[datetime] = None
     notes: Optional[str] = None
     job_description: Optional[str] = None
-    job_link: str
+    job_link: Optional[str] = None
     
 
     
