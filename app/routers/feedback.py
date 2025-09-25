@@ -106,3 +106,4 @@ async def analyze_resume(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+

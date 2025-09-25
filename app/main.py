@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from app.routers import applications, auth, cloudinary, feedback, resume, users
+from app.routers import applications, auth, cloudinary, feedback, jd_proxy, resume, users
 from app.database import SessionLocal
 from app.routers.auth import cleanup_expired_reset_codes
 from app.utils.scheduler import start_scheduler, scheduler
@@ -18,6 +18,7 @@ app.include_router(resume.router)
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(cloudinary.router)
+app.include_router(jd_proxy.router)
 
 
 
