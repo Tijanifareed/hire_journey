@@ -41,6 +41,11 @@ app.add_middleware(
 def root():
     return {"message": "Welcome to HireJourney API 🚀"}
 
+@app.get("/health")
+@app.head("/health")
+async def health():
+    return {"status": "ok"}
+
 @app.on_event("startup")
 def _startup():
     start_scheduler()
