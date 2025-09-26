@@ -39,7 +39,7 @@ app.add_middleware(
 
 @app.get("/")
 def root():
-    return {"message": "Welcome to Job Tracker API 🚀"}
+    return {"message": "Welcome to HireJourney API 🚀"}
 
 @app.on_event("startup")
 def _startup():
