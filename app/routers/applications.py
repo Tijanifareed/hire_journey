@@ -425,7 +425,7 @@ def get_upcoming_interview(
     pretty = dt_local.strftime("%A, %B %d, %Y at %I:%M %p %Z")
 
     return {
-        "message": f"Upcoming: {upcoming.company}, {pretty} 🗓️",
+        "message": f"Upcoming interview at {upcoming.company}: {pretty} 🗓️",
         "application_id": upcoming.id,
         "job_title": upcoming.job_title,
         "company": upcoming.company,
