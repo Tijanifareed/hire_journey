@@ -184,3 +184,145 @@ def send_mail(subject, body, to_email, attachments=None, html=False):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to send email: {e}")
+
+
+
+def backill_user_plans():
+    from app.models import User, UserPlan
+    db = database.SessionLocal()
+    
+    users = db.query(User).all()
+    for user in users:
+        existing = db.query(UserPlan).filter_by(user_id=user.id).first()
+        if not existing:
+            new_plan = UserPlan(user_id=user.id, plan="free")
+            db.add(new_plan)
+    db.commit()
+    print("✅ Backfilled user_plans for all existing users")
+        
+
+# def check_feature_access(db: Session, user_id: int, feature_name: str) -> bool:
+#     """Check if a user can use a feature, update usage if allowed."""
+
+#     # 1. Get the user's plan
+#     plan = db.query(models.UserPlan).filter(models.UserPlan.user_id == user_id).first()
+#     if not plan:
+#         user_plan = models.UserPlan(user_id=user_id, plan="free")
+#         db.add(user_plan)
+#         db.commit()
+#         return check_feature_access(db, user_id, feature_name)
+#     # 2. Free vs Pro logic
+#     if plan.plan == "pro":
+#         return True  # unlimited access ✅
+
+#     # 3. Define Free plan feature limits
+#     free_limits = {
+#         "ai_analysis": 10,
+#         "jd_screenshot": 3,
+#         "jd_url": 10,
+#         "application": 2,
+#     }
+
+#     max_limit = free_limits.get(feature_name)
+#     if not max_limit:
+#         return True  # if not in limits, allow anyway
+
+#     # 4. Check feature usage
+#     usage = db.query(models.FeatureUsage).filter(
+#         models.FeatureUsage.user_id == user_id,
+#         models.FeatureUsage.feature == feature_name
+#     ).first()
+
+#     if usage:
+#         if usage.used_count >= max_limit:
+#             return False  # ❌ exceeded
+#         usage.used_count += 1
+#         usage.updated_at = datetime.utcnow()
+#     else:
+#         usage = models.FeatureUsage(
+#             user_id=user_id,
+#             feature=feature_name,
+#             used_count=1,
+#             # max_limit=max_limit,
+#             period_start=datetime.utcnow(),
+#             period_end=datetime.utcnow() + timedelta(days=31),  # 👈 required
+#             created_at=datetime.utcnow(),
+#             updated_at=datetime.utcnow()
+#         )
+#         db.add(usage)
+
+#     db.commit()
+#     return True
+
+
+
+
+def check_feature_access(db: Session, user_id: int, feature_name: str) -> bool:
+    """Check if a user can use a feature, update usage if allowed."""
+
+    now = datetime.utcnow()
+
+    # 1. Get the user's plan
+    plan = db.query(models.UserPlan).filter(models.UserPlan.user_id == user_id).first()
+    if not plan:
+        # create default free plan if missing
+        plan = models.UserPlan(user_id=user_id, plan="free")
+        db.add(plan)
+        db.commit()
+        return check_feature_access(db, user_id, feature_name)
+
+    # 2. Handle Pro Users
+    if plan.plan == "pro":
+        # if expired + 5 day grace period → downgrade to free
+        if plan.plan_expires_at and now > plan.plan_expires_at + timedelta(days=5):
+            plan.plan = "free"
+            plan.plan_expires_at = None
+            db.commit()
+            # fall through to free logic 👇
+        else:
+            return True  # still valid pro, unlimited ✅
+
+    # 3. Free Plan Logic
+    free_limits = {
+        "ai_analysis": 10,
+        "jd_screenshot": 3,
+        "jd_url": 10,
+        "application": 3,
+    }
+
+    max_limit = free_limits.get(feature_name)
+    if not max_limit:
+        return True  # unrestricted feature
+
+    usage = db.query(models.FeatureUsage).filter(
+        models.FeatureUsage.user_id == user_id,
+        models.FeatureUsage.feature == feature_name
+    ).first()
+
+    if usage:
+        # check if the cycle expired
+        if now > usage.period_end:
+            # reset usage cycle
+            usage.used_count = 1
+            usage.period_start = now
+            usage.period_end = now + timedelta(days=31)
+        else:
+            if usage.used_count >= max_limit:
+                return False  # ❌ limit reached
+            usage.used_count += 1
+        usage.updated_at = now
+    else:
+        # first time using this feature
+        usage = models.FeatureUsage(
+            user_id=user_id,
+            feature=feature_name,
+            used_count=1,
+            period_start=now,
+            period_end=now + timedelta(days=31),
+            created_at=now,
+            updated_at=now
+        )
+        db.add(usage)
+
+    db.commit()
+    return True

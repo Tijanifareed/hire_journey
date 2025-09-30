@@ -10,7 +10,7 @@ from app import models, database
 from app.schemas import AddApplicationRequest, InterviewDateRequest, RecentApplicationResponse, StatsResponse, UpdateApplicationRequest
 from app.utils.time_ago import time_ago
 from app.utils.interview import make_ics, parse_local_datetime, resolve_to_iana, schedule_reminders_for_application
-from app.utils.utils import get_current_user, send_mail
+from app.utils.utils import check_feature_access, get_current_user, send_mail
 
 
 router = APIRouter(prefix="/applications", tags=["Applications"])
@@ -35,6 +35,8 @@ def add_new_application(
   db: Session = Depends(get_db),
   current_user: models.User = Depends(get_current_user)
 ):
+    # if not check_feature_access(db, current_user.id, "application"):
+    #     raise HTTPException(status_code=403, detail="Feature limit reached for free plan. Upgrade to Pro.")
     new_application = models.Application(
         job_title=application_data.job_title,
         company=application_data.company,

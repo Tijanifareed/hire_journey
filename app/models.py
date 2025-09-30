@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Index, Integer, String, DateTime, ForeignKey, Boolean, Enum
+from sqlalchemy import Column, Index, Integer, String, DateTime, ForeignKey, Boolean, Enum, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.database import Base
 import datetime
@@ -24,6 +24,8 @@ class User(Base):
     applications = relationship("Application", back_populates="user", cascade="all, delete-orphan")
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
     resumes = relationship("Resume", back_populates="user", cascade="all, delete-orphan")
+    plan = relationship("UserPlan", back_populates="user", cascade="all, delete-orphan", uselist=False)
+    usages = relationship("FeatureUsage", back_populates="user")
 
     
 class ApplicationStatus(PyEnum):
@@ -121,7 +123,7 @@ class Notification(Base):
     scheduled_date = Column(DateTime, nullable=False)
     is_sent = Column(Boolean, default=False)
     
-    # Many-to-oneJ
+    # Many-to-one
     user = relationship("User", back_populates="notifications")
     application = relationship("Application", back_populates="notifications")
     
@@ -144,3 +146,51 @@ class PasswordReset(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
     code = Column(String(10), nullable=False)
     expires_at = Column(DateTime, default=lambda: datetime.datetime.utcnow() + datetime.timedelta(minutes=10))    
+    
+    
+# class UserSettings(Base):
+#     __tablename__ = "user_settings"
+    
+#     id = Column(Integer, primary_key=True, index=True)
+#     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+#     email_notifications = Column(Boolean, default=True)
+#     sms_notifications = Column(Boolean, default=False)
+#     push_notifications = Column(Boolean, default=False)
+#     daily_summary_time = Column(String(5), nullable=True)  # e.g., "08:00" for 8 AM
+#     timezone = Column(Enum(TimezoneEnum), default=TimezoneEnum.UTC, nullable=False)
+    
+#     user = relationship("User")
+
+
+class UserPlan(Base):
+    __tablename__ = "user_plans"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+    plan = Column(String(50), nullable=False, default="free")  # e.g., Free, Pro, Premium
+    max_resumes = Column(Integer, nullable=False, default=5)
+    plan_expires_at = Column(DateTime, nullable=True, index=True)  # null means no expiration (free plan)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    user = relationship("User", back_populates="plan")
+    
+    
+class FeatureUsage(Base):
+    __tablename__ = "feature_usages"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    feature = Column(String(100), nullable=False,)  # e.g., "resume"
+    used_count = Column(Integer, default=0, nullable=False)
+    period_start = Column(DateTime, default=datetime.datetime.utcnow)
+    period_end = Column(DateTime, nullable=False)  # e.g., end of the month    
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    # max_limit = Column(Integer, nullable=False, default=5)  # e.g., max allowed in the period
+    __table_args__ = (
+        UniqueConstraint("user_id", "feature", "period_start", "period_end", name="unique_usage_period"),
+    )
+    
+    user = relationship("User", back_populates="usages")
+    

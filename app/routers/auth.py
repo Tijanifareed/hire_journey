@@ -41,7 +41,9 @@ def create_account(user: UserCreate, db: Session = Depends(get_db)):
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    
+    user_plan = models.UserPlan(user_id=db_user.id, plan="free")
+    db.add(user_plan)
+    db.commit()
     
     return JSONResponse(
         status_code=200,
