@@ -1,11 +1,15 @@
-from fastapi import APIRouter
+import os
 from app import database
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Body
 from sqlalchemy.orm import Session
 from app import models, database
-from app.schemas import AddResumeRequest
+from app.schema.schemas import AddResumeRequest
 from app.utils.utils import get_current_user
 import cloudinary.uploader
+from typing import Dict
+from fastapi.responses import StreamingResponse
+import io
+import requests
 
 
 router = APIRouter(prefix="/resume", tags=["Resume"])
@@ -108,3 +112,76 @@ def get_resume(resume_id: int, db: Session = Depends(get_db), current_user: mode
     if not resume or resume.user_id != current_user.id:
         raise HTTPException(status_code=404, detail="Resume not found")
     return {"resume": resume}
+
+
+@router.post("/upload")
+async def upload_resume(file: UploadFile = File(...)) -> Dict:
+    try:
+        # TODO: parse PDF -> ResumeData (mock for now)
+        resume = {
+            "personalInfo": {
+                "fullName": "John Doe",
+                "email": "john@example.com",
+            },
+            "summary": "Results-driven software engineer...",
+            "experience": [],
+            "education": [],
+            "skills": []
+        }
+        # TODO: run initial analysis (mock numbers)
+        analysis = {
+            "atsScore": 65,
+            "keywordMatch": 70,
+            "missingKeywords": ["Python", "Docker"],
+            "suggestions": ["Add measurable achievements."]
+        }
+        return {"resume": resume, "analysis": analysis}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Parsing failed: {e}")
+    
+    
+    import requests
+from fastapi import APIRouter, HTTPException, Body
+from fastapi.responses import StreamingResponse
+import io
+
+
+BROWSERLESS_TOKEN = os.getenv(
+    "BROWSERLESS_TOKEN",
+    "2TCJXP5xQVFwTO605ef2d89bbff63ea3d864a63219c1f8ec8"
+)
+
+@router.post("/export")
+async def export_resume(data: dict = Body(...)):
+    html = data.get("html")
+    if not html:
+        raise HTTPException(status_code=400, detail="Missing HTML content")
+
+    payload = {
+        # ✅ use HTML exactly as received (no rewrapping)
+        "html": html,
+        "options": {
+            "format": "A4",
+            "printBackground": True,
+            "preferCSSPageSize": True,
+            "margin": {"top": "10mm", "bottom": "10mm"},
+        },
+    }
+
+    url = f"https://production-sfo.browserless.io/pdf?token={BROWSERLESS_TOKEN}"
+
+    try:
+        response = requests.post(url, json=payload, timeout=60)
+        print("Browserless status:", response.status_code)
+        if response.status_code != 200:
+            print("Browserless error:", response.text[:500])
+            raise HTTPException(status_code=500, detail="Browserless PDF generation failed")
+    except Exception as e:
+        print("❌ Request error:", e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+    return StreamingResponse(
+        io.BytesIO(response.content),
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="resume.pdf"'},
+    )

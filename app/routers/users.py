@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app import database, models
-from app.schemas import ProfileUpdateRequest
+from app.schema.schemas import ProfileUpdateRequest
 from app.utils.utils import get_current_user
 
 

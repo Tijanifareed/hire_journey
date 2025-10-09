@@ -132,3 +132,328 @@ Now produce the JSON using the provided JD and Resume above.
      }
 
 
+
+# def extract_resume_json_with_groq(resume_text: str) -> dict:
+#     """
+#     Use Groq API to parse raw resume text into structured Classic Resume JSON.
+#     Flexible enough to handle resumes with missing or nonstandard sections.
+#     """
+#     if not GROQ_API_KEY:
+#         raise RuntimeError("GROQ_API_KEY not set in environment")
+
+#     url = "https://api.groq.com/openai/v1/chat/completions"
+#     headers = {
+#         "Authorization": f"Bearer {GROQ_API_KEY}",
+#         "Content-Type": "application/json",
+#     }
+
+#     payload = {
+#         "model": GROQ_MODEL,
+#         "temperature": 0,
+#         "response_format": {"type": "json_object"},
+#         "messages": [
+#             {
+#                 "role": "system",
+#                 "content": """
+# You are a parser that converts unstructured resume text into structured JSON
+# following this flexible schema. The goal is to extract as much structured info as possible
+# without guessing or fabricating data.
+
+# ### SCHEMA (Return valid JSON only)
+# {
+#   "personalInfo": {
+#     "fullName": string,
+#     "email": string,
+#     "phone": string (optional),
+#     "title": string (optional),
+#     "location": string (optional),
+#     "linkedin": string (optional)
+#   },
+#   "summary": string (optional),
+#   "experience": [
+#     {
+#       "role": string,
+#       "company": string,
+#       "startDate": string (optional),
+#       "endDate": string (optional),
+#       "achievements": [string]
+#     }
+#   ],
+#   "projects": [
+#     {
+#       "name": string,
+#       "achievements": [string]
+#     }
+#   ],
+#   "education": [
+#     {
+#       "institution": string,
+#       "degree": string (optional),
+#       "startDate": string (optional),
+#       "endDate": string (optional)
+#     }
+#   ],
+#   "skills": {
+#     "Languages": [string],
+#     "Frameworks": [string],
+#     "Tools": [string],
+#     "Others": [string]
+#   }
+# }
+
+# RULES:
+# - If the resume has no projects section, return `"projects": []`.
+# - If skills are not categorized, put them all under `"Others"`.
+# - Skip empty skill categories entirely (e.g. omit "Frameworks" if no items).
+# - Never invent data; leave missing values as empty or omit field.
+# - Output must be valid JSON only — no markdown, comments, or explanations.
+# """
+#             },
+#             {"role": "user", "content": resume_text}
+#         ],
+#     }
+
+#     try:
+#         resp = requests.post(url, headers=headers, json=payload, timeout=30)
+#         resp.raise_for_status()
+#         data = resp.json()
+#         content = data["choices"][0]["message"]["content"].strip()
+#         match = re.search(r"\{.*\}", content, re.DOTALL)
+#         if not match:
+#             raise ValueError("Groq did not return valid JSON")
+
+#         resume_data = json.loads(match.group())
+
+#         # Normalize keys & fill safe defaults
+#         resume_data.setdefault("projects", [])
+#         resume_data.setdefault("experience", [])
+#         resume_data.setdefault("education", [])
+#         resume_data.setdefault("summary", "")
+#         resume_data.setdefault("skills", {})
+#         resume_data.setdefault("personalInfo", {})
+
+#         # Clean up empty skill categories
+#         skills = resume_data.get("skills", {})
+#         resume_data["skills"] = {k: v for k, v in skills.items() if v}
+
+#         return resume_data
+
+#     except Exception as e:
+#         logger.error(f"Groq JSON extraction failed: {e}")
+#         return {
+#             "personalInfo": {
+#                 "fullName": "",
+#                 "email": "",
+#                 "phone": "",
+#                 "location": "",
+#                 "linkedin": ""
+#             },
+#             "summary": "",
+#             "experience": [],
+#             "projects": [],
+#             "education": [],
+#             "skills": {}
+#         }
+
+def extract_resume_json_with_groq(resume_text: str) -> dict:
+    """
+    Dynamically extract and structure a resume into universal 'Classic' JSON.
+    Works across any profession — AI determines section names and order.
+    """
+    if not GROQ_API_KEY:
+        raise RuntimeError("GROQ_API_KEY not set in environment")
+
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "model": GROQ_MODEL,
+        "temperature": 0,
+        "response_format": {"type": "json_object"},
+        "messages": [
+            {
+                "role": "system",
+                "content": """
+You are an advanced resume parser that converts *any unstructured resume text* (from any profession or region) into a standardized, universal JSON structure usable for classic resume templates and ATS systems."
+
+### OUTPUT FORMAT (VALID JSON ONLY)
+{
+  "sections": {
+    "Header": {
+      "fullName": string,
+      "title": string (optional),
+      "email": string,
+      "phone": string (optional),
+      "location": string (optional),
+      "linkedin": string (optional),
+      "website": string (optional)
+    },
+
+    "Professional Summary": string (optional),
+
+    "Skills": {
+      "<category>": [string]
+    },
+
+    "Work Experience": [
+      {
+        "role": string,
+        "company": string,
+        "location": string (optional),
+        "startDate": string (optional),
+        "endDate": string (optional),
+        "achievements": [string]
+      }
+    ],
+
+    "Projects": [
+      {
+        "name": string,
+        "achievements": [string],
+        "techStack": [string] (optional)
+      }
+    ],
+
+    "Education": [
+      {
+        "institution": string,
+        "degree": string (optional),
+        "location": string (optional),
+        "startDate": string (optional),
+        "endDate": string (optional)
+      }
+    ],
+
+    "Certifications": [string] (optional),
+    "Awards": [string] (optional),
+    "Publications": [string] (optional),
+    "Languages": [string] (optional),
+    "Volunteer Experience": [object] (optional),
+    "Memberships": [string] (optional),
+    "References": [string] (optional)
+  },
+
+  "order": [string]  // ordered list of section names (AI decides based on relevance)
+}
+
+### RULES:
+1. Works for *any* profession: engineering, healthcare, finance, law, education, design, etc.
+2. Detect and create skill categories dynamically (e.g., “Clinical”, “Finance & Accounting”, “Software Development”, “Communication”, “Leadership”).
+3. NEVER group everything under “Others”. If skills span domains, create multiple logical categories.
+4. Extract **real content only** — no invented details.
+5. Keep text concise, clean, and professional.
+6. Preserve logical order of sections as they appear or make sense for the profession.
+7. Always output **valid JSON** — no markdown or extra commentary.
+8. Limit the text to ~2 pages’ worth of content.
+"""
+            },
+            {"role": "user", "content": resume_text}
+        ],
+    }
+
+    try:
+        resp = requests.post(url, headers=headers, json=payload, timeout=60)
+        resp.raise_for_status()
+        data = resp.json()
+        content = data["choices"][0]["message"]["content"].strip()
+        match = re.search(r"\{.*\}", content, re.DOTALL)
+        if not match:
+            raise ValueError("Groq did not return valid JSON")
+
+        parsed = json.loads(match.group())
+
+        # Safety defaults
+        parsed.setdefault("sections", {})
+        parsed.setdefault("order", list(parsed["sections"].keys()))
+
+        return parsed
+
+    except Exception as e:
+        logger.error(f"Groq universal resume parse failed: {e}")
+        return {"sections": {}, "order": []}
+
+
+
+
+import re
+from datetime import datetime
+
+def normalize_date(value: str) -> str:
+    """
+    Normalize date strings to YYYY-MM or 'Present'.
+    Rules:
+    - "Present" stays as is.
+    - "2020" → "2020-01"
+    - "May 2025", "May2025", "05/2025", "2025/05" → "2025-05"
+    - Unknown/unparseable → ""
+    """
+    if not value:
+        return ""
+    
+    value = value.strip()
+
+    # Keep Present
+    if re.search(r'present', value, re.IGNORECASE):
+        return "Present"
+
+    # Year only
+    year_match = re.fullmatch(r'(\d{4})', value)
+    if year_match:
+        return f"{year_match.group(1)}-01"
+
+    # Month + Year (e.g., "May 2025" or "May2025")
+    month_map = {
+        "jan": "01", "january": "01",
+        "feb": "02", "february": "02",
+        "mar": "03", "march": "03",
+        "apr": "04", "april": "04",
+        "may": "05",
+        "jun": "06", "june": "06",
+        "jul": "07", "july": "07",
+        "aug": "08", "august": "08",
+        "sep": "09", "sept": "09", "september": "09",
+        "oct": "10", "october": "10",
+        "nov": "11", "november": "11",
+        "dec": "12", "december": "12",
+    }
+    month_year = re.match(r'([A-Za-z]+)\s?(\d{4})', value)
+    if month_year:
+        month_str, year = month_year.groups()
+        month = month_map.get(month_str.lower()[:3])
+        if month:
+            return f"{year}-{month}"
+
+    # Formats like 05/2025 or 2025/05
+    slash_match = re.match(r'(\d{1,2})[/-](\d{4})', value)
+    if slash_match:
+        m, y = slash_match.groups()
+        return f"{y}-{int(m):02d}"
+    slash_match2 = re.match(r'(\d{4})[/-](\d{1,2})', value)
+    if slash_match2:
+        y, m = slash_match2.groups()
+        return f"{y}-{int(m):02d}"
+
+    # Already ISO
+    iso_match = re.match(r'(\d{4})-(\d{2})', value)
+    if iso_match:
+        return value
+
+    return ""  # Fallback if nonsense
+
+
+def clean_resume_json(resume_json: dict) -> dict:
+    """
+    Walk the ResumeData JSON and normalize all date fields.
+    """
+    for exp in resume_json.get("experience", []):
+        exp["startDate"] = normalize_date(exp.get("startDate", ""))
+        exp["endDate"] = normalize_date(exp.get("endDate", ""))
+
+    for edu in resume_json.get("education", []):
+        edu["startDate"] = normalize_date(edu.get("startDate", ""))
+        edu["endDate"] = normalize_date(edu.get("endDate", ""))
+
+    return resume_json

@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from app import database
-from app.schemas import ChangePasswordRequest, ForgotPasswordRequest, RefreshRequest, TimeZoneRequest, TokenResponse
+from app.schema.schemas import ChangePasswordRequest, ForgotPasswordRequest, RefreshRequest, TimeZoneRequest, TokenResponse
 from app.enums.timezones import TimezoneEnum
 from app.utils.utils import create_refresh_token, get_current_user, refresh_token, send_mail
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app import models, database
-from app.schemas import ForgotPasswordRequest, ResetPasswordRequest, UserCreate, UserLogin
+from app.schema.schemas import ForgotPasswordRequest, ResetPasswordRequest, UserCreate, UserLogin
 from passlib.hash import bcrypt
 from app.utils.utils import create_access_token, genarate_reset_token, get_current_user, send_mail
 import logging
