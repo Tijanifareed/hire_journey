@@ -348,6 +348,8 @@ You are an advanced resume parser that converts *any unstructured resume text* (
 6. Preserve logical order of sections as they appear or make sense for the profession.
 7. Always output **valid JSON** — no markdown or extra commentary.
 8. Limit the text to ~2 pages’ worth of content.
+9. If a section is missing, omit it from the "sections" object.
+10. Never return empty section (e.g, if there us certifications in the section list and it has no data under it).
 """
             },
             {"role": "user", "content": resume_text}
