@@ -3,6 +3,7 @@ import re
 import json
 import requests
 import logging
+import re
 logger = logging.getLogger(__name__)
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -83,9 +84,11 @@ DETERMINISTIC RULES & MATCHING ALGORITHM (follow exactly)
      • Relevance of job titles & achievements (metrics present): 0-30
    - Then combine: ats_score = floor( 0.7 * keyword_match_score + 0.3 * resume_quality ).
 6. missing_keywords:
+   - Return Missing JD Keywords that the hiring manager or recruiter would spot out and care about.
    - Return every JD keyword whose final match weight == 0. Order can be any.
    - If all keywords matched (sum_of_weights equals total JD keywords), return [].
 7. suggestions:
+   - Return suggestions that an hiring manager or recruiter would give to improve the resume.
    - Return 5–10 short (max 120 characters each) actionable suggestions in plain English.
    - Keep them conservative and specific (e.g., "Add 'Spring Boot' to skills if you have experience", "Quantify achievements with numbers", "Match job title to JD").
 8. Output requirements:
@@ -132,128 +135,6 @@ Now produce the JSON using the provided JD and Resume above.
      }
 
 
-
-# def extract_resume_json_with_groq(resume_text: str) -> dict:
-#     """
-#     Use Groq API to parse raw resume text into structured Classic Resume JSON.
-#     Flexible enough to handle resumes with missing or nonstandard sections.
-#     """
-#     if not GROQ_API_KEY:
-#         raise RuntimeError("GROQ_API_KEY not set in environment")
-
-#     url = "https://api.groq.com/openai/v1/chat/completions"
-#     headers = {
-#         "Authorization": f"Bearer {GROQ_API_KEY}",
-#         "Content-Type": "application/json",
-#     }
-
-#     payload = {
-#         "model": GROQ_MODEL,
-#         "temperature": 0,
-#         "response_format": {"type": "json_object"},
-#         "messages": [
-#             {
-#                 "role": "system",
-#                 "content": """
-# You are a parser that converts unstructured resume text into structured JSON
-# following this flexible schema. The goal is to extract as much structured info as possible
-# without guessing or fabricating data.
-
-# ### SCHEMA (Return valid JSON only)
-# {
-#   "personalInfo": {
-#     "fullName": string,
-#     "email": string,
-#     "phone": string (optional),
-#     "title": string (optional),
-#     "location": string (optional),
-#     "linkedin": string (optional)
-#   },
-#   "summary": string (optional),
-#   "experience": [
-#     {
-#       "role": string,
-#       "company": string,
-#       "startDate": string (optional),
-#       "endDate": string (optional),
-#       "achievements": [string]
-#     }
-#   ],
-#   "projects": [
-#     {
-#       "name": string,
-#       "achievements": [string]
-#     }
-#   ],
-#   "education": [
-#     {
-#       "institution": string,
-#       "degree": string (optional),
-#       "startDate": string (optional),
-#       "endDate": string (optional)
-#     }
-#   ],
-#   "skills": {
-#     "Languages": [string],
-#     "Frameworks": [string],
-#     "Tools": [string],
-#     "Others": [string]
-#   }
-# }
-
-# RULES:
-# - If the resume has no projects section, return `"projects": []`.
-# - If skills are not categorized, put them all under `"Others"`.
-# - Skip empty skill categories entirely (e.g. omit "Frameworks" if no items).
-# - Never invent data; leave missing values as empty or omit field.
-# - Output must be valid JSON only — no markdown, comments, or explanations.
-# """
-#             },
-#             {"role": "user", "content": resume_text}
-#         ],
-#     }
-
-#     try:
-#         resp = requests.post(url, headers=headers, json=payload, timeout=30)
-#         resp.raise_for_status()
-#         data = resp.json()
-#         content = data["choices"][0]["message"]["content"].strip()
-#         match = re.search(r"\{.*\}", content, re.DOTALL)
-#         if not match:
-#             raise ValueError("Groq did not return valid JSON")
-
-#         resume_data = json.loads(match.group())
-
-#         # Normalize keys & fill safe defaults
-#         resume_data.setdefault("projects", [])
-#         resume_data.setdefault("experience", [])
-#         resume_data.setdefault("education", [])
-#         resume_data.setdefault("summary", "")
-#         resume_data.setdefault("skills", {})
-#         resume_data.setdefault("personalInfo", {})
-
-#         # Clean up empty skill categories
-#         skills = resume_data.get("skills", {})
-#         resume_data["skills"] = {k: v for k, v in skills.items() if v}
-
-#         return resume_data
-
-#     except Exception as e:
-#         logger.error(f"Groq JSON extraction failed: {e}")
-#         return {
-#             "personalInfo": {
-#                 "fullName": "",
-#                 "email": "",
-#                 "phone": "",
-#                 "location": "",
-#                 "linkedin": ""
-#             },
-#             "summary": "",
-#             "experience": [],
-#             "projects": [],
-#             "education": [],
-#             "skills": {}
-#         }
 
 def extract_resume_json_with_groq(resume_text: str) -> dict:
     """
@@ -380,8 +261,7 @@ You are an advanced resume parser that converts *any unstructured resume text* (
 
 
 
-import re
-from datetime import datetime
+
 
 def normalize_date(value: str) -> str:
     """
